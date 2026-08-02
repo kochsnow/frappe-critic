@@ -1,0 +1,9 @@
+recursive-include frappe_critic/public *
+recursive-include frappe_critic/frappe_critic *
+recursive-include frappe_critic/config *
+recursive-include frappe_critic/templates *
+recursive-include frappe_critic/patches *
+recursive-include frappe_critic/fixtures *
+recursive-include rules *
+include frappe_critic/modules.txt
+include frappe_critic/patches.txt

@@ -1,0 +1,38 @@
+{
+ "doctype": "Workspace",
+ "name": "Critic",
+ "label": "Critic",
+ "module": "Frappe Critic",
+ "category": "Tools",
+ "icon": "shield",
+ "is_standard": 1,
+ "public": 1,
+ "content": "[{\"type\": \"header\", \"data\": {\"text\": \"Code Security Analysis\", \"level\": 4}}]",
+ "links": [
+  {
+   "label": "Analysis Tools",
+   "links": [
+    {
+     "label": "Critic Dashboard",
+     "link_to": "critic-dashboard",
+     "link_type": "Page",
+     "type": "Link"
+    },
+    {
+     "label": "Scan Findings",
+     "link_to": "Critic Finding",
+     "link_type": "DocType",
+     "type": "Link"
+    }
+   ]
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "Start New Scan",
+   "link_to": "critic-dashboard",
+   "type": "Link",
+   "icon": "play"
+  }
+ ]
+}

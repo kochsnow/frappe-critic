@@ -1,0 +1,90 @@
+{
+  "doctype": "DocType",
+  "name": "Critic Audit Log",
+  "module": "Frappe Critic",
+  "field_order": [
+    "status",
+    "scope",
+    "selected_apps_json",
+    "ruleset",
+    "started_at",
+    "finished_at",
+    "total_findings",
+    "risk_score",
+    "summary_json",
+    "error"
+  ],
+  "fields": [
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "Status",
+      "options": "Queued\nRunning\nDone\nFailed",
+      "default": "Queued"
+    },
+    {
+      "fieldname": "scope",
+      "fieldtype": "Select",
+      "label": "Scan Scope",
+      "options": "Primary\nInstalled\nBench",
+      "default": "Installed"
+    },
+    {
+      "fieldname": "selected_apps_json",
+      "fieldtype": "Code",
+      "label": "Selected Apps",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ruleset",
+      "fieldtype": "Data",
+      "label": "Ruleset",
+      "default": "bundled"
+    },
+    {
+      "fieldname": "started_at",
+      "fieldtype": "Datetime",
+      "label": "Started At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "finished_at",
+      "fieldtype": "Datetime",
+      "label": "Finished At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "total_findings",
+      "fieldtype": "Int",
+      "label": "Total Findings",
+      "read_only": 1
+    },
+    {
+      "fieldname": "risk_score",
+      "fieldtype": "Int",
+      "label": "Risk Score (0-100)",
+      "read_only": 1
+    },
+    {
+      "fieldname": "summary_json",
+      "fieldtype": "Code",
+      "label": "Summary JSON",
+      "read_only": 1
+    },
+    {
+      "fieldname": "error",
+      "fieldtype": "Text",
+      "label": "Error",
+      "read_only": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    }
+  ]
+}

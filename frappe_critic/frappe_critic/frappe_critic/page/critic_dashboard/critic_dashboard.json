@@ -1,0 +1,11 @@
+{
+  "doctype": "Page",
+  "name": "critic-dashboard",
+  "page_name": "critic-dashboard",
+  "title": "Critic Dashboard",
+  "module": "Frappe Critic",
+  "standard": "Yes",
+  "roles": [],
+  "icon": "octicon octicon-shield",
+  "restrict_to_domain": null
+}

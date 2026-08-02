@@ -1,0 +1,101 @@
+{
+  "doctype": "DocType",
+  "name": "Critic Finding",
+  "module": "Frappe Critic",
+  "field_order": [
+    "audit_log",
+    "app",
+    "file_path",
+    "line_start",
+    "line_end",
+    "rule_id",
+    "severity",
+    "category",
+    "message",
+    "code_snippet",
+    "ai_status",
+    "ai_response"
+  ],
+  "fields": [
+    {
+      "fieldname": "audit_log",
+      "fieldtype": "Link",
+      "label": "Audit Log",
+      "options": "Critic Audit Log",
+      "reqd": 1
+    },
+    {
+      "fieldname": "app",
+      "fieldtype": "Data",
+      "label": "App",
+      "reqd": 1
+    },
+    {
+      "fieldname": "file_path",
+      "fieldtype": "Data",
+      "label": "File Path",
+      "length": 512,
+      "reqd": 1
+    },
+    {
+      "fieldname": "line_start",
+      "fieldtype": "Int",
+      "label": "Line Start",
+      "reqd": 1
+    },
+    {
+      "fieldname": "line_end",
+      "fieldtype": "Int",
+      "label": "Line End",
+      "reqd": 1
+    },
+    {
+      "fieldname": "rule_id",
+      "fieldtype": "Data",
+      "label": "Rule ID"
+    },
+    {
+      "fieldname": "severity",
+      "fieldtype": "Select",
+      "label": "Severity",
+      "options": "Critical\nHigh\nMedium\nLow\nInfo",
+      "default": "Info"
+    },
+    {
+      "fieldname": "category",
+      "fieldtype": "Data",
+      "label": "Category"
+    },
+    {
+      "fieldname": "message",
+      "fieldtype": "Text",
+      "label": "Message"
+    },
+    {
+      "fieldname": "code_snippet",
+      "fieldtype": "Code",
+      "label": "Code Snippet"
+    },
+    {
+      "fieldname": "ai_status",
+      "fieldtype": "Select",
+      "label": "AI Status",
+      "options": "NotRequested\nPreviewed\nRequested\nDone\nFailed",
+      "default": "NotRequested"
+    },
+    {
+      "fieldname": "ai_response",
+      "fieldtype": "Text",
+      "label": "AI Response"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    }
+  ]
+}

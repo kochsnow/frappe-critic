@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Frappe / Bench local state
+frappe-bench/
+sites/
+logs/
+*.log
+
+# Docker / local development state
+.env
+.env.*
+docker-compose.override.yml
+
+# Backups and generated database dumps
+backups/
+*.sql
+*.tgz
+*.tar
+*.tar.gz
+
+# Node / assets
+node_modules/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

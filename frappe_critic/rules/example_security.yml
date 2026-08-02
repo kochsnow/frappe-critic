@@ -1,0 +1,8 @@
+rules:
+  - id: frappe-sql-injection
+    patterns:
+      - pattern: frappe.db.sql($QUERY)
+    message: Potential SQL injection vulnerability
+    severity: WARNING
+    languages:
+      - python
