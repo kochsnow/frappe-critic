@@ -1,0 +1,86 @@
+{
+  "doctype": "DocType",
+  "name": "Critic Remediation Task",
+  "module": "Frappe Critic",
+  "autoname": "hash",
+  "field_order": [
+    "finding",
+    "status",
+    "harbor_schema_version",
+    "task_name",
+    "task_path",
+    "task_archive",
+    "task_sha256",
+    "source_sha256",
+    "error"
+  ],
+  "fields": [
+    {
+      "fieldname": "finding",
+      "fieldtype": "Link",
+      "label": "Finding",
+      "options": "Critic Finding",
+      "reqd": 1
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "label": "Status",
+      "options": "Preparing\nReady\nFailed",
+      "default": "Preparing",
+      "reqd": 1
+    },
+    {
+      "fieldname": "harbor_schema_version",
+      "fieldtype": "Data",
+      "label": "Harbor Schema Version",
+      "read_only": 1
+    },
+    {
+      "fieldname": "task_name",
+      "fieldtype": "Data",
+      "label": "Harbor Task Name",
+      "read_only": 1
+    },
+    {
+      "fieldname": "task_path",
+      "fieldtype": "Data",
+      "label": "Private Task Path",
+      "length": 512,
+      "read_only": 1
+    },
+    {
+      "fieldname": "task_archive",
+      "fieldtype": "Attach",
+      "label": "Task Archive",
+      "read_only": 1
+    },
+    {
+      "fieldname": "task_sha256",
+      "fieldtype": "Data",
+      "label": "Task SHA-256",
+      "read_only": 1
+    },
+    {
+      "fieldname": "source_sha256",
+      "fieldtype": "Data",
+      "label": "Source SHA-256",
+      "read_only": 1
+    },
+    {
+      "fieldname": "error",
+      "fieldtype": "Text",
+      "label": "Error",
+      "read_only": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    }
+  ]
+}

@@ -9,6 +9,10 @@ frappe.pages["critic-dashboard"].on_page_load = function (wrapper) {
   let current_audit_log = null;
   let status_check_interval = null;
 
+  function escape_html(value) {
+    return $("<div>").text(value == null ? "" : String(value)).html();
+  }
+
   // Load scan options
   frappe.call({
     method: "frappe_critic.api.get_scan_options",
@@ -241,6 +245,7 @@ frappe.pages["critic-dashboard"].on_page_load = function (wrapper) {
     }
 
     const table = $(`
+      <div class="table-responsive">
       <table class="table table-bordered">
         <thead>
           <tr>
@@ -254,6 +259,7 @@ frappe.pages["critic-dashboard"].on_page_load = function (wrapper) {
         </thead>
         <tbody></tbody>
       </table>
+      </div>
     `).appendTo(container);
 
     const tbody = table.find("tbody");
@@ -267,42 +273,106 @@ frappe.pages["critic-dashboard"].on_page_load = function (wrapper) {
         Info: "secondary",
       };
 
+      const is_prepared = finding.remediation_status === "Ready";
+      const button_label = is_prepared ? __("View Harbor Task") : __("Prepare AI Fix");
       const row = $(`
         <tr>
-          <td>${finding.app}</td>
-          <td>${finding.file_path}</td>
-          <td>${finding.line_start}</td>
-          <td><span class="label label-${severity_colors[finding.severity] || "default"}">${finding.severity}</span></td>
-          <td>${finding.message}</td>
-          <td><button class="btn btn-xs btn-primary ai-fix-btn" data-finding="${finding.name}">AI Fix</button></td>
+          <td>${escape_html(finding.app)}</td>
+          <td>${escape_html(finding.file_path)}</td>
+          <td>${escape_html(finding.line_start)}</td>
+          <td><span class="label label-${severity_colors[finding.severity] || "default"}">${escape_html(finding.severity)}</span></td>
+          <td>${escape_html(finding.message)}</td>
+          <td>
+            <button class="btn btn-xs btn-primary ai-fix-btn" data-finding="${escape_html(finding.name)}">
+              ${escape_html(button_label)}
+            </button>
+            <div class="text-muted" style="margin-top: 4px; font-size: 11px;">${escape_html(finding.remediation_status || "NotPrepared")}</div>
+          </td>
         </tr>
       `).appendTo(tbody);
     });
 
-    // 在 render_findings 函数中修改按钮点击事件
-  tbody.find(".ai-fix-btn").on("click", function () {
+    tbody.find(".ai-fix-btn").on("click", function () {
+      const $button = $(this);
       const finding_name = $(this).data("finding");
+      const original_label = $button.text().trim();
 
       const d = new frappe.ui.Dialog({
-          title: __('AI Fix Suggestion'),
-          fields: [
-              { fieldname: 'ai_suggestion', fieldtype: 'Markdown Editor', label: __('Suggestion'), read_only: 1 }
-          ]
+        title: __('Harbor Remediation Task'),
+        size: 'extra-large',
+        fields: [
+          { fieldname: 'preview_body', fieldtype: 'HTML' }
+        ]
       });
 
       d.show();
-      d.set_df_property('ai_suggestion', 'label', __('Analyzing...'));
+      d.fields_dict.preview_body.$wrapper.html(`
+        <div class="alert alert-blue">
+          <b>${escape_html(__("Prepare only"))}</b>: ${escape_html(__("No Agent will run and no source files will be changed."))}
+        </div>
+        <div class="text-muted">${escape_html(__("Converting the finding into a private Harbor task package..."))}</div>
+      `);
+      $button.prop("disabled", true).text(__("Preparing..."));
 
       frappe.call({
-          method: "frappe_critic.api.get_ai_fix",
-          args: { finding_name: finding_name },
-          callback: function (r) {
-              if (r.message) {
-                  d.set_value('ai_suggestion', r.message);
-                  d.set_df_property('ai_suggestion', 'label', __('AI Fix Plan'));
-              }
+        method: "frappe_critic.api.prepare_harbor_task",
+        args: { finding_name: finding_name },
+        callback: function (r) {
+          const result = r.message;
+          if (result && result.ok) {
+            render_harbor_task(d, result);
+            $button.text(__("View Harbor Task"));
+            $button.siblings(".text-muted").text(result.status);
+          } else {
+            const message = (result && result.error) || __("Harbor task preparation returned no artifact.");
+            render_harbor_error(d, message);
+            $button.text(original_label);
+            $button.siblings(".text-muted").text("Failed");
           }
+        },
+        error: function () {
+          render_harbor_error(d, __("Harbor task preparation failed. Check the server error log for details."));
+          $button.text(original_label);
+          $button.siblings(".text-muted").text("Failed");
+        },
+        always: function () {
+          $button.prop("disabled", false);
+        }
       });
-  });
+    });
+  }
+
+  function render_harbor_task(dialog, task) {
+    const cached_note = task.cached
+      ? `<span class="text-muted">${escape_html(__("Loaded saved task"))}</span>`
+      : `<span class="text-success">${escape_html(__("New Harbor task saved"))}</span>`;
+    const download_link = task.task_archive
+      ? `<a class="btn btn-sm btn-default" href="${escape_html(task.task_archive)}" target="_blank">${escape_html(__("Download Task Package"))}</a>`
+      : "";
+
+    dialog.fields_dict.preview_body.$wrapper.html(`
+      <div class="alert alert-blue">
+        <b>${escape_html(__("Harbor task ready"))}</b>: ${escape_html(__("No Agent ran and no source files were changed."))}
+      </div>
+      <div style="margin-bottom: 16px;">
+        ${cached_note}<br>
+        <span class="text-muted">${escape_html(task.task_name)} · Harbor schema ${escape_html(task.harbor_schema_version)}</span>
+      </div>
+      <h5>${escape_html(__("Private task path"))}</h5>
+      <pre>${escape_html(task.task_path)}</pre>
+      <h5>${escape_html(__("Artifact SHA-256"))}</h5>
+      <pre>${escape_html(task.task_sha256)}</pre>
+      <div style="margin-top: 16px;">${download_link}</div>
+    `);
+  }
+
+  function render_harbor_error(dialog, message) {
+    dialog.fields_dict.preview_body.$wrapper.html(`
+      <div class="alert alert-danger">
+        <b>${escape_html(__("Harbor task preparation failed"))}</b><br>
+        <span style="white-space: pre-wrap;">${escape_html(message)}</span>
+      </div>
+      <p class="text-muted">${escape_html(__("No Agent ran and no source files were changed."))}</p>
+    `);
   }
 };

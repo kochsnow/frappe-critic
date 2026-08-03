@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="frappe_critic",
-    version="0.0.1",
+    version="0.1.0",
     description="Frappe-Critic - Semgrep-based security auditing plugin for Frappe",
     author="",
     author_email="",

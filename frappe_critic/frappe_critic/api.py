@@ -1,8 +1,23 @@
-import frappe
-from frappe import _
+import io
 import json
 import os
-import requests  # 新增：用于调用 AI 接口
+from pathlib import Path
+import shutil
+import subprocess
+from urllib.parse import urlparse
+import zipfile
+
+import frappe
+from frappe import _
+import requests
+
+from frappe_critic.ai_fix import AIResponseError, build_fix_prompt, build_preview
+from frappe_critic.harbor_task import (
+    HARBOR_SCHEMA_VERSION,
+    HarborFinding,
+    build_harbor_task_package,
+    sha256_file,
+)
 
 @frappe.whitelist()
 def get_scan_options():
@@ -70,79 +85,281 @@ def get_findings(audit_log_name, start=0, limit=100):
     findings = frappe.db.get_all(
         "Critic Finding",
         filters={"audit_log": audit_log_name},
-        fields=["name", "app", "file_path", "line_start", "line_end", "rule_id", "severity", "message", "code_snippet", "ai_status"],
+        fields=[
+            "name", "app", "file_path", "line_start", "line_end", "rule_id",
+            "severity", "message", "code_snippet", "ai_status",
+            "remediation_status", "latest_remediation_task",
+        ],
         start=start,
         limit=limit
     )
     return findings
 
+
 @frappe.whitelist()
-def get_ai_fix(finding_name):
-    """调用 AI 获取修复建议"""
-    # 1. 获取 Finding 详情
+def prepare_harbor_task(finding_name, regenerate=False):
+    """Convert one finding into a private, runnable Harbor task package."""
+    frappe.only_for("System Manager")
     finding = frappe.get_doc("Critic Finding", finding_name)
+    if not frappe.has_permission("Critic Finding", "read", doc=finding):
+        frappe.throw(_("Not permitted to view this finding."), frappe.PermissionError)
 
-    # 2. 获取 AI 配置 (需预先创建 Critic Settings DocType)
+    regenerate = str(regenerate).lower() in {"1", "true", "yes"}
+    if not regenerate and finding.latest_remediation_task:
+        existing = frappe.get_doc("Critic Remediation Task", finding.latest_remediation_task)
+        if existing.status == "Ready":
+            return _harbor_task_response(existing, cached=True)
+
+    task_doc = frappe.get_doc({
+        "doctype": "Critic Remediation Task",
+        "finding": finding.name,
+        "status": "Preparing",
+        "harbor_schema_version": HARBOR_SCHEMA_VERSION,
+    }).insert()
+
+    finding.remediation_status = "Preparing"
+    finding.latest_remediation_task = task_doc.name
+    finding.save()
+
+    task_root = Path(
+        frappe.get_site_path("private", "frappe_critic", "harbor_tasks")
+    )
+    task_root.mkdir(parents=True, exist_ok=True)
+    final_path = task_root / task_doc.name.lower()
+    temporary_path = task_root / f".{task_doc.name.lower()}.tmp"
+
     try:
-        settings = frappe.get_single("Critic Settings")
-    except frappe.DoesNotExistError:
-        frappe.throw(_("Please create 'Critic Settings' DocType first."))
+        source_path, app_root = _resolve_finding_source(finding)
+        source_hash = finding.source_sha256 or sha256_file(source_path)
+        result = build_harbor_task_package(
+            output_dir=temporary_path,
+            finding=HarborFinding(
+                name=finding.name,
+                audit_log=finding.audit_log,
+                app=finding.app,
+                file_path=finding.file_path,
+                line_start=finding.line_start,
+                line_end=finding.line_end,
+                rule_id=finding.rule_id or "unknown-rule",
+                severity=finding.severity or "Info",
+                message=finding.message or "",
+                code_snippet=finding.code_snippet or "",
+                source_sha256=source_hash,
+                base_commit=_git_commit(app_root),
+            ),
+            source_file=source_path,
+            rules_dir=Path(frappe.get_app_path("frappe_critic", "..", "rules", "rules")),
+        )
+        temporary_path.rename(final_path)
 
-    if not settings.api_key:
-        frappe.throw(_("Please configure API Key in 'Critic Settings' first."))
+        from frappe.utils.file_manager import save_file
 
-    # 3. 构造 Prompt (这里可以根据需要进行脱敏处理)
-    prompt = f"""
-    You are an expert Frappe Framework developer.
-    Analyze the following code issue detected by Semgrep and provide a fix.
+        archive = save_file(
+            f"{task_doc.name.lower()}-harbor-task.zip",
+            _zip_task(final_path),
+            "Critic Remediation Task",
+            task_doc.name,
+            is_private=1,
+        )
 
-    Issue: {finding.message}
-    Severity: {finding.severity}
+        task_doc.status = "Ready"
+        task_doc.task_name = result.task_name
+        task_doc.task_path = str(final_path.relative_to(Path(frappe.get_site_path())))
+        task_doc.task_archive = archive.file_url
+        task_doc.task_sha256 = result.task_sha256
+        task_doc.source_sha256 = result.source_sha256
+        task_doc.error = None
+        task_doc.save()
 
-    Code Snippet:
-    ```python
-    {finding.code_snippet}
-    ```
-
-    Please provide:
-    1. A short explanation of the vulnerability.
-    2. The corrected code snippet using Frappe v15 best practices.
-    """
-
-    # 4. 发送 API 请求
-    try:
-        api_key = settings.get_password("api_key")
-        base_url = settings.base_url or "https://api.openai.com/v1/chat/completions"
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": settings.model or "gpt-4o",
-            "messages": [
-                {"role": "system", "content": "You are a Frappe Security Expert."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.2
-        }
-
-        response = requests.post(base_url, headers=headers, json=payload, timeout=40)
-        response.raise_for_status()
-
-        ai_response = response.json()
-        suggestion = ai_response['choices'][0]['message']['content']
-
-        # 更新 Finding 状态
-        finding.ai_status = "Done"
+        finding.remediation_status = "Ready"
+        finding.latest_remediation_task = task_doc.name
         finding.save()
+        return _harbor_task_response(task_doc, cached=False)
 
-        return suggestion
+    except Exception as exc:
+        shutil.rmtree(temporary_path, ignore_errors=True)
+        shutil.rmtree(final_path, ignore_errors=True)
+        frappe.log_error(frappe.get_traceback(), "Critic Harbor Task Error")
+        task_doc.status = "Failed"
+        task_doc.error = str(exc)[:2000]
+        task_doc.save()
+        finding.remediation_status = "Failed"
+        finding.latest_remediation_task = task_doc.name
+        finding.save()
+        return {
+            "ok": False,
+            "status": "Failed",
+            "remediation_task": task_doc.name,
+            "error": task_doc.error,
+        }
 
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Critic AI Fix Error")
-        frappe.throw(_("AI Fix failed: {0}").format(str(e)))
+
+def _harbor_task_response(task_doc, cached):
+    return {
+        "ok": True,
+        "status": task_doc.status,
+        "cached": cached,
+        "remediation_task": task_doc.name,
+        "harbor_schema_version": task_doc.harbor_schema_version,
+        "task_name": task_doc.task_name,
+        "task_path": task_doc.task_path,
+        "task_archive": task_doc.task_archive,
+        "task_sha256": task_doc.task_sha256,
+        "source_sha256": task_doc.source_sha256,
+    }
+
+
+def _resolve_finding_source(finding):
+    apps_root = Path(frappe.get_app_path("frappe", "..", "..")).resolve()
+    app_root = (apps_root / finding.app).resolve()
+    source_path = (apps_root / finding.file_path).resolve()
+    if not source_path.is_relative_to(app_root):
+        raise ValueError(_("Finding path is outside the selected app."))
+    if not source_path.is_file():
+        raise FileNotFoundError(_("Finding source file no longer exists: {0}").format(finding.file_path))
+    return source_path, app_root
+
+
+def _git_commit(app_root):
+    result = subprocess.run(
+        ["git", "-C", str(app_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _zip_task(task_path):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(item for item in task_path.rglob("*") if item.is_file()):
+            archive.write(path, Path(task_path.name) / path.relative_to(task_path))
+    return buffer.getvalue()
+
+@frappe.whitelist()
+def get_ai_fix(finding_name, regenerate=False):
+    """Generate or return a review-only AI fix preview.
+
+    This endpoint never modifies scanned source files. A successful preview is
+    deliberately stored as ``Previewed``; ``Done`` is reserved for a future,
+    explicitly confirmed apply-and-verify workflow.
+    """
+    frappe.only_for("System Manager")
+    finding = frappe.get_doc("Critic Finding", finding_name)
+    if not frappe.has_permission("Critic Finding", "read", doc=finding):
+        frappe.throw(_("Not permitted to view this finding."), frappe.PermissionError)
+
+    regenerate = str(regenerate).lower() in {"1", "true", "yes"}
+    if finding.ai_status == "Previewed" and finding.ai_fix and not regenerate:
+        return _preview_response(finding, cached=True)
+
+    if not frappe.db.exists("DocType", "Critic Settings"):
+        return _record_ai_failure(
+            finding,
+            _("Critic Settings is not installed. Run bench migrate and try again."),
+        )
+
+    settings = frappe.get_single("Critic Settings")
+    api_key = settings.get_password("api_key", raise_exception=False)
+    if not api_key:
+        return _record_ai_failure(
+            finding,
+            _("AI Fix is not configured. Add an API key in Critic Settings."),
+        )
+
+    endpoint = settings.base_url or "https://api.openai.com/v1/chat/completions"
+    parsed_endpoint = urlparse(endpoint)
+    if parsed_endpoint.scheme not in {"http", "https"} or not parsed_endpoint.netloc:
+        return _record_ai_failure(
+            finding,
+            _("Critic Settings contains an invalid Chat Completions URL."),
+        )
+
+    model = settings.model or "gpt-4o"
+    finding.ai_status = "Requested"
+    finding.ai_error = None
+    finding.save()
+
+    try:
+        response = requests.post(
+            endpoint,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You create minimal, reviewable Frappe security patches.",
+                    },
+                    {"role": "user", "content": build_fix_prompt(finding)},
+                ],
+                "temperature": 0.1,
+            },
+            timeout=(10, 60),
+        )
+        if not response.ok:
+            raise AIResponseError(_provider_error(response))
+
+        preview = build_preview(finding, response.json(), model)
+        finding.ai_status = "Previewed"
+        finding.ai_model = preview["model"]
+        finding.ai_explanation = preview["explanation"]
+        finding.ai_fix = preview["corrected_code"]
+        finding.ai_patch = preview["patch"]
+        finding.ai_response = preview["raw_response"]
+        finding.ai_error = None
+        finding.save()
+        return _preview_response(finding, cached=False)
+
+    except (requests.RequestException, ValueError) as exc:
+        frappe.log_error(frappe.get_traceback(), "Critic AI Fix Preview Error")
+        return _record_ai_failure(finding, _("AI Fix preview failed: {0}").format(str(exc)))
+
+
+def _preview_response(finding, cached):
+    return {
+        "ok": True,
+        "status": finding.ai_status,
+        "cached": cached,
+        "preview_only": True,
+        "finding_name": finding.name,
+        "file_path": finding.file_path,
+        "model": finding.ai_model,
+        "explanation": finding.ai_explanation,
+        "corrected_code": finding.ai_fix,
+        "patch": finding.ai_patch,
+    }
+
+
+def _record_ai_failure(finding, message):
+    finding.ai_status = "Failed"
+    finding.ai_error = str(message)[:2000]
+    finding.save()
+    return {
+        "ok": False,
+        "status": "Failed",
+        "preview_only": True,
+        "finding_name": finding.name,
+        "error": finding.ai_error,
+    }
+
+
+def _provider_error(response):
+    try:
+        data = response.json()
+        error = data.get("error", {}) if isinstance(data, dict) else {}
+        detail = error.get("message") if isinstance(error, dict) else None
+    except ValueError:
+        detail = None
+    return _("AI provider returned HTTP {0}: {1}").format(
+        response.status_code,
+        (detail or response.reason or _("Unknown provider error"))[:500],
+    )
 
 def run_scan_job(audit_log_name, selected_apps):
     """后台执行 Semgrep 扫描的任务"""
@@ -197,6 +414,7 @@ def run_scan_job(audit_log_name, selected_apps):
                     "severity": mapped_severity,
                     "message": candidate.raw_reason,
                     "code_snippet": candidate.code_snippet,
+                    "source_sha256": sha256_file(Path(raw_path)),
                     "ai_status": "NotRequested"
                 })
                 finding_doc.insert()
