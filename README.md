@@ -17,10 +17,6 @@ Current status: MVP / developer preview. Scanning and the first safe remediation
 
 ## What is not finished yet
 
-- Running a Harbor agent, collecting its patch, applying it, testing it, and
-  rescanning are planned follow-up stages. Task preparation does none of these.
-- The development Frappe container does not currently include Harbor or a Docker
-  socket; use a separate trusted runner for agent execution.
 - Direct online AI preview settings remain experimental and are not the default
   Dashboard flow.
 - Findings table has no pagination/filtering yet.
@@ -87,6 +83,33 @@ The ZIP follows Harbor's task layout:
 └── context/
     └── finding.json
 ```
+
+## Remediation with Harbor agents
+
+The downloaded ZIP can be used with the broader
+[Harbor agent ecosystem](https://www.harborframework.com/docs/agents), so agent
+selection and execution stay outside Frappe Critic. A typical workflow is:
+
+```text
+Download and extract the Harbor task ZIP
+→ run the task with a Harbor-supported agent
+→ let the agent modify the isolated source snapshot
+→ run the included tests/test.sh verifier
+→ review the resulting changes and verification reward
+→ apply the approved patch to the original app or repository
+→ run Frappe Critic again to confirm the finding is resolved
+```
+
+For example, from a machine with Harbor and its container runtime configured:
+
+```bash
+harbor run -p /path/to/extracted/task -a <agent> -m <model>
+```
+
+Frappe Critic deliberately does not embed an agent runner or automatically apply
+generated changes. This keeps source modification under user control and avoids
+duplicating Harbor's agent orchestration. The included development Frappe
+container therefore does not require Harbor, a Docker CLI, or a Docker socket.
 
 ## Useful development commands
 
