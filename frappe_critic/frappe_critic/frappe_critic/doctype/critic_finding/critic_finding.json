@@ -13,7 +13,16 @@
     "category",
     "message",
     "code_snippet",
+    "source_sha256",
+    "remediation_status",
+    "latest_remediation_task",
+    "ai_section",
     "ai_status",
+    "ai_model",
+    "ai_explanation",
+    "ai_fix",
+    "ai_patch",
+    "ai_error",
     "ai_response"
   ],
   "fields": [
@@ -77,6 +86,33 @@
       "label": "Code Snippet"
     },
     {
+      "fieldname": "source_sha256",
+      "fieldtype": "Data",
+      "label": "Source SHA-256",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "remediation_status",
+      "fieldtype": "Select",
+      "label": "Remediation Status",
+      "options": "NotPrepared\nPreparing\nReady\nFailed",
+      "default": "NotPrepared",
+      "read_only": 1
+    },
+    {
+      "fieldname": "latest_remediation_task",
+      "fieldtype": "Link",
+      "label": "Latest Remediation Task",
+      "options": "Critic Remediation Task",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ai_section",
+      "fieldtype": "Section Break",
+      "label": "AI Fix Preview"
+    },
+    {
       "fieldname": "ai_status",
       "fieldtype": "Select",
       "label": "AI Status",
@@ -84,9 +120,41 @@
       "default": "NotRequested"
     },
     {
+      "fieldname": "ai_model",
+      "fieldtype": "Data",
+      "label": "AI Model",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ai_explanation",
+      "fieldtype": "Text",
+      "label": "AI Explanation",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ai_fix",
+      "fieldtype": "Code",
+      "label": "Corrected Code Preview",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ai_patch",
+      "fieldtype": "Code",
+      "label": "Unified Diff Preview",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ai_error",
+      "fieldtype": "Text",
+      "label": "AI Error",
+      "read_only": 1
+    },
+    {
       "fieldname": "ai_response",
       "fieldtype": "Text",
-      "label": "AI Response"
+      "label": "Raw AI Response",
+      "read_only": 1,
+      "hidden": 1
     }
   ],
   "permissions": [

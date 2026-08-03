@@ -10,18 +10,18 @@
 - Findings API returns results.
 - Generated files and local backups are ignored by `.gitignore`.
 - Basic README, contributing notes, changelog, and security policy are present.
+- MIT repository license is present.
+- Publisher and license package metadata are filled.
+- Dashboard remediation prepares Harbor artifacts without calling an AI provider
+  or modifying source; direct online AI preview remains experimental.
+- `Critic Settings` is included in app metadata and migrates cleanly.
+- Private notes remain outside the repository and are not tracked.
+- Tracked files were checked for generated archives, database files, site
+  configuration, and non-development credentials.
 
 ## Before public launch
 
-- Choose and add a repository license.
-- Fill package metadata:
-  - publisher / author
-  - contact email
-  - license field
-- Decide whether AI Fix is included in the first public release or marked hidden/experimental.
-- Verify `Critic Settings` is installed and migrated cleanly.
-- Remove or archive private notes outside the public repository.
-- Confirm no secrets, database dumps, local credentials, or generated artifacts are tracked.
+- Add a public project contact email when one is available.
 - Run a fresh clone smoke test:
 
 ```bash
@@ -38,8 +38,9 @@ Then verify:
 
 ## Recommended first release scope
 
-Ship as `v0.1.0-dev` or `v0.1.0-alpha` with this positioning:
+Ship `v0.1.0` with this positioning:
 
 > Developer preview of a Semgrep-based security review dashboard for Frappe apps.
 
-Do not present AI Fix as stable until settings, data handling, and error states are complete.
+Present Harbor task preparation as the supported remediation boundary. Do not
+present direct online AI preview or automatic patch application as stable.

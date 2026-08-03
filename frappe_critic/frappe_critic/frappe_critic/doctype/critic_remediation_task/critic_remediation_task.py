@@ -1,5 +1,5 @@
 from frappe.model.document import Document
 
 
-class CriticSettings(Document):
+class CriticRemediationTask(Document):
 	pass

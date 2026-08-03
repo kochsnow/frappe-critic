@@ -4,14 +4,15 @@ Frappe Critic is itself a security-oriented developer tool, but it is still in d
 
 ## Supported versions
 
-No stable release line exists yet. Until the first public release, security fixes should target the main development branch.
+`0.1.x` is the currently supported developer-preview release line. Security
+fixes target the latest release and the `main` branch.
 
 ## Reporting a vulnerability
 
-If this repository is published publicly, add a private reporting path here before launch, such as:
-
-- GitHub private vulnerability reporting, or
-- a dedicated security email address.
+Use [GitHub Security Advisories](https://github.com/kochsnow/frappe-critic/security/advisories/new)
+to report vulnerabilities privately. If private reporting is unavailable,
+open a minimal issue requesting a private contact channel without including
+exploit details.
 
 Please avoid publishing exploit details publicly before a fix or mitigation is available.
 
