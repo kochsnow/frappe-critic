@@ -2,6 +2,7 @@
 
 ## [0.1.0] - 2026-08-03
 
+- Released Frappe Critic under the MIT License.
 - Added safe Finding-to-Harbor 1.3 task conversion from the Dashboard.
 - Added private task directories and downloadable ZIP artifacts with SHA-256
   checksums and source-drift protection.

@@ -175,4 +175,7 @@ Use it only when you intentionally want a fresh local environment.
 
 ## License
 
-License is not selected yet. Choose one before publishing the repository publicly.
+Frappe Critic is licensed under the [MIT License](LICENSE).
+
+Bundled rules under `frappe_critic/rules/` retain their original copyright and
+MIT license notices.
